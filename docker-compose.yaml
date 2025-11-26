@@ -1,0 +1,79 @@
+version: '3.8'
+services:
+  zookeeper:
+    image: bitnami/zookeeper:latest
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+    ports:
+      - "2181:2181"
+  kafka:
+    image: bitnami/kafka:latest
+    depends_on: [zookeeper]
+    environment:
+      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092
+      - ALLOW_PLAINTEXT_LISTENER=yes
+    ports:
+      - "9092:9092"
+  mosquitto:
+    image: eclipse-mosquitto
+    ports: ["1883:1883"]
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+    ports: ["5432:5432"]
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+  mqtt-kafka-gateway:
+    build: ./services/mqtt-kafka-gateway
+    environment:
+      MQTT_BROKER: mosquitto:1883
+      KAFKA_BOOTSTRAP: kafka:9092
+    depends_on: [mosquitto,kafka]
+  sensor-processor:
+    build: ./services/sensor-processor
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9092
+    depends_on: [kafka]
+  storage-writer:
+    build: ./services/storage-writer
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9092
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_NAME: greenhouse
+    depends_on: [kafka,postgres]
+  control-service:
+    build: ./services/control-service
+    environment:
+      KAFKA_BOOTSTRAP: kafka:9092
+      MQTT_BROKER: mosquitto:1883
+    depends_on: [kafka,mosquitto]
+  api-gateway:
+    build: ./services/api-gateway
+    environment:
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASS: postgres
+      DB_NAME: greenhouse
+    ports:
+      - "8080:8000"
+    depends_on: [postgres]
+  frontend:
+    build: ./services/frontend
+    ports:
+      - "8081:80"
+    depends_on: [api-gateway]
+  load-generator:
+    build: ./services/load-generator
+    environment:
+      MODE: mqtt
+      MQTT_BROKER: mosquitto:1883
+    depends_on: [mosquitto]
+
+volumes:
+  postgres-data:
