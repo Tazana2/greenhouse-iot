@@ -1,0 +1,4 @@
+paho-mqtt
+kafka-python
+requests
+python-dotenv

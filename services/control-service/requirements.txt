@@ -1,0 +1,6 @@
+fastapi
+uvicorn[standard]
+kafka-python
+paho-mqtt
+prometheus-client
+python-dotenv
