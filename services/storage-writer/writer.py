@@ -24,10 +24,15 @@ app = FastAPI()
 write_counter = Counter("db_writes_total", "Rows written to DB")
 
 def init_db():
-    conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASS)
+    # First, connect to postgres default database to create greenhouse database if not exists
+    conn = psycopg2.connect(host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASS, dbname='postgres')
     conn.autocommit = True
     cur = conn.cursor()
-    cur.execute(f"CREATE DATABASE IF NOT EXISTS {DB_NAME};")
+    # Check if database exists
+    cur.execute(f"SELECT 1 FROM pg_database WHERE datname = '{DB_NAME}'")
+    exists = cur.fetchone()
+    if not exists:
+        cur.execute(f"CREATE DATABASE {DB_NAME}")
     cur.close()
     conn.close()
     # connect to DB and create table
