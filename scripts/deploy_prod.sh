@@ -13,16 +13,13 @@ echo "Deploying to Kubernetes cluster with registry: $DOCKER_REGISTRY"
 # Create namespace
 kubectl apply -f k8s/namespace.yaml
 
-# Add Helm repos
-helm repo add bitnami https://charts.bitnami.com/bitnami
-helm repo update
+# Deploy Kafka and Zookeeper
+echo "Deploying Kafka and Zookeeper..."
+kubectl apply -f k8s/kafka-deployment.yaml
 
-# Install Kafka with persistent storage
-echo "Installing Kafka..."
-helm upgrade --install kafka bitnami/kafka \
-  --namespace greenhouse \
-  -f k8s/kafka-values.yaml \
-  --wait
+# Wait for Kafka to be ready
+echo "Waiting for Kafka to be ready..."
+kubectl wait --for=condition=ready pod -l app=kafka -n greenhouse --timeout=300s
 
 # Deploy Mosquitto
 echo "Deploying Mosquitto MQTT broker..."
