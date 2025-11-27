@@ -31,7 +31,7 @@ async def health():
     return {"status":"ok"}
 
 @app.get("/sensors/latest")
-async def sensors_latest(limit: int = 50):
+async def sensors_latest(limit: int = 200):
     conn = get_conn()
     cur = conn.cursor()
     cur.execute("SELECT sensor_id, payload, server_ts FROM measurements ORDER BY server_ts DESC LIMIT %s", (limit,))
