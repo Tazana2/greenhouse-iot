@@ -3,10 +3,11 @@ import json
 import time
 import threading
 from fastapi import FastAPI
-from paho.mqtt.client import Client as MQTTClient
+import paho.mqtt.client as mqttClient
 from kafka import KafkaProducer
 from prometheus_client import start_http_server, Counter
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
 load_dotenv()
 
@@ -16,13 +17,12 @@ KAFKA_BOOTSTRAP = os.getenv("KAFKA_BOOTSTRAP", "kafka:9092")
 KAFKA_TOPIC = os.getenv("KAFKA_TOPIC", "sensors.raw")
 METRICS_PORT = int(os.getenv("METRICS_PORT", "8001"))
 
-app = FastAPI()
 producer = KafkaProducer(bootstrap_servers=KAFKA_BOOTSTRAP.split(","), value_serializer=lambda v: json.dumps(v).encode('utf-8'))
 
 pub_counter = Counter("gateway_messages_published_total", "Messages published to Kafka")
 recv_counter = Counter("gateway_messages_received_total", "Messages received from MQTT")
 
-def on_connect(client, userdata, flags, rc):
+def on_connect(client, userdata, flags, rc, properties):
     print("MQTT connected rc=", rc)
     client.subscribe(MQTT_TOPIC)
 
@@ -47,18 +47,20 @@ def on_message(client, userdata, msg):
         print("Error on_message:", e)
 
 def mqtt_loop():
-    client = MQTTClient()
+    client = mqttClient.Client(mqttClient.CallbackAPIVersion.VERSION2)
     client.on_connect = on_connect
     client.on_message = on_message
     host, port = MQTT_BROKER.split(":")
     client.connect(host, int(port))
     client.loop_forever()
 
-@app.on_event("startup")
-def startup_event():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     threading.Thread(target=mqtt_loop, daemon=True).start()
-    # Start prometheus exporter on separate port
     start_http_server(METRICS_PORT)
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
 async def health():

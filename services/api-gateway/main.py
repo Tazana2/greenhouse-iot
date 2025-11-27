@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from prometheus_client import start_http_server
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
 load_dotenv()
 
@@ -14,14 +15,16 @@ DB_PASS = os.getenv("DB_PASS", "postgres")
 DB_NAME = os.getenv("DB_NAME", "greenhouse")
 METRICS_PORT = int(os.getenv("METRICS_PORT", "8005"))
 
-app = FastAPI()
 
 def get_conn():
     return psycopg2.connect(host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASS, dbname=DB_NAME)
 
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def startup():
     start_http_server(METRICS_PORT)
+    yield
+
+app = FastAPI(lifespan=startup)
 
 @app.get("/health")
 async def health():

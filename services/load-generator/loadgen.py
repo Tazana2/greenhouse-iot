@@ -3,7 +3,7 @@ import time
 import json
 import random
 from threading import Thread
-from paho.mqtt.client import Client as MQTTClient
+import paho.mqtt.client as mqttClient
 from kafka import KafkaProducer
 from dotenv import load_dotenv
 
@@ -19,7 +19,7 @@ SENSORS = int(os.getenv("SENSORS", "200"))
 RATE_PER_SENSOR = float(os.getenv("RATE_PER_SENSOR", "0.2"))  # messages per second per sensor
 
 def mqtt_worker(sensor_id):
-    mqtt = MQTTClient()
+    mqtt =  mqttClient.Client(mqttClient.CallbackAPIVersion.VERSION2)
     host, port = MQTT_BROKER.split(":")
     mqtt.connect(host, int(port))
     mqtt.loop_start()

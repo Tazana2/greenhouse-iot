@@ -6,6 +6,7 @@ from kafka import KafkaConsumer, KafkaProducer
 from fastapi import FastAPI
 from prometheus_client import start_http_server, Counter
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
 load_dotenv()
 
@@ -14,7 +15,6 @@ INPUT_TOPIC = os.getenv("INPUT_TOPIC", "sensors.raw")
 OUTPUT_TOPIC = os.getenv("OUTPUT_TOPIC", "sensors.processed")
 METRICS_PORT = int(os.getenv("METRICS_PORT", "8002"))
 
-app = FastAPI()
 producer = KafkaProducer(bootstrap_servers=KAFKA_BOOTSTRAP.split(","), value_serializer=lambda v: json.dumps(v).encode('utf-8'))
 
 processed_counter = Counter("processed_messages_total", "Processed messages")
@@ -49,10 +49,13 @@ def consume_loop():
         except Exception as e:
             print("processing error:", e)
 
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     threading.Thread(target=consume_loop, daemon=True).start()
     start_http_server(METRICS_PORT)
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
 async def health():

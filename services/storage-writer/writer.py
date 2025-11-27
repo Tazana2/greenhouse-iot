@@ -7,6 +7,7 @@ from kafka import KafkaConsumer
 from fastapi import FastAPI
 from prometheus_client import start_http_server, Counter
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
 load_dotenv()
 
@@ -20,7 +21,6 @@ DB_USER = os.getenv("DB_USER", "postgres")
 DB_PASS = os.getenv("DB_PASS", "postgres")
 DB_NAME = os.getenv("DB_NAME", "greenhouse")
 
-app = FastAPI()
 write_counter = Counter("db_writes_total", "Rows written to DB")
 
 def init_db():
@@ -67,14 +67,17 @@ def consume_loop():
         conn.commit()
         write_counter.inc()
 
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     try:
         init_db()
     except Exception as e:
         print("init db failed (maybe DB not ready):", e)
     threading.Thread(target=consume_loop, daemon=True).start()
     start_http_server(METRICS_PORT)
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
 async def health():

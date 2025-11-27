@@ -3,10 +3,11 @@ import json
 import threading
 import time
 from kafka import KafkaConsumer, KafkaProducer
-from paho.mqtt.client import Client as MQTTClient
+import paho.mqtt.client as mqttClient
 from fastapi import FastAPI
 from prometheus_client import start_http_server, Counter
 from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
 load_dotenv()
 
@@ -19,8 +20,6 @@ METRICS_PORT = int(os.getenv("METRICS_PORT", "8004"))
 producer = KafkaProducer(bootstrap_servers=KAFKA_BOOTSTRAP.split(","), value_serializer=lambda v: json.dumps(v).encode('utf-8'))
 
 command_counter = Counter("commands_sent_total", "Commands produced to actuators")
-
-app = FastAPI()
 
 def find_rule_and_act(record):
     values = record.get("values", {})
@@ -67,7 +66,7 @@ def consume_loop():
 
 def mqtt_publish_loop():
     # subscribe to actuators.status maybe; also republishes commands to MQTT if needed
-    mqtt = MQTTClient()
+    mqtt = mqttClient.Client(mqttClient.CallbackAPIVersion.VERSION2)
     host, port = MQTT_BROKER.split(":")
     mqtt.connect(host, int(port))
     mqtt.loop_start()
@@ -85,11 +84,14 @@ def mqtt_publish_loop():
         except Exception as e:
             print("mqtt publish error:", e)
 
-@app.on_event("startup")
-def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     threading.Thread(target=consume_loop, daemon=True).start()
     threading.Thread(target=mqtt_publish_loop, daemon=True).start()
     start_http_server(METRICS_PORT)
+    yield
+
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
 async def health():
