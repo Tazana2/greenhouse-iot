@@ -1,7 +1,12 @@
 node_modules
-npm-debug.log
-build
+dist
 .git
 .gitignore
-README.md
+*.md
 .env
+.env.local
+.env.development
+.env.production
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
