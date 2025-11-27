@@ -20,11 +20,11 @@ def get_conn():
     return psycopg2.connect(host=DB_HOST, port=DB_PORT, user=DB_USER, password=DB_PASS, dbname=DB_NAME)
 
 @asynccontextmanager
-async def startup():
+async def lifespan(app: FastAPI):
     start_http_server(METRICS_PORT)
     yield
 
-app = FastAPI(lifespan=startup)
+app = FastAPI(lifespan=lifespan)
 
 @app.get("/health")
 async def health():
