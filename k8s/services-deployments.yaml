@@ -11,7 +11,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: tu_usuario/mqtt-kafka-gateway:latest # Change to your Docker Hub username
+        image: ${DOCKER_REGISTRY}/mqtt-kafka-gateway:latest
         env:
         - name: MQTT_BROKER
           value: "mosquitto:1883"
@@ -47,7 +47,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: tu_usuario/sensor-processor:latest
+        image: ${DOCKER_REGISTRY}/sensor-processor:latest
         env:
         - name: KAFKA_BOOTSTRAP
           value: "kafka:9092"
@@ -85,7 +85,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: tu_usuario/storage-writer:latest
+        image: ${DOCKER_REGISTRY}/storage-writer:latest
         env:
         - name: KAFKA_BOOTSTRAP
           value: "kafka:9092"
@@ -127,7 +127,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: tu_usuario/control-service:latest
+        image: ${DOCKER_REGISTRY}/control-service:latest
         env:
         - name: KAFKA_BOOTSTRAP
           value: "kafka:9092"
@@ -158,7 +158,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: tu_usuario/api-gateway:latest
+        image: ${DOCKER_REGISTRY}/api-gateway:latest
         env:
         - name: DB_HOST
           value: "postgres"
@@ -197,7 +197,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: tu_usuario/load-generator:latest
+        image: ${DOCKER_REGISTRY}/load-generator:latest
         env:
         - name: MODE
           value: "mqtt"
@@ -220,7 +220,7 @@ spec:
     spec:
       containers:
       - name: app
-        image: tu_usuario/frontend:latest
+        image: ${DOCKER_REGISTRY}/frontend:latest
         ports: [{ containerPort: 80 }]
 ---
 apiVersion: v1

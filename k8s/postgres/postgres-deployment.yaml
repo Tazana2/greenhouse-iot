@@ -25,6 +25,21 @@ spec:
       labels:
         app: postgres
     spec:
+      initContainers:
+      - name: init-db
+        image: postgres:15
+        env:
+        - name: POSTGRES_PASSWORD
+          value: "postgres"
+        - name: POSTGRES_USER
+          value: "postgres"
+        - name: POSTGRES_DB
+          value: "greenhouse"
+        command:
+        - sh
+        - -c
+        - |
+          echo "Init container - database will be created automatically"
       containers:
       - name: postgres
         image: postgres:15
@@ -33,6 +48,8 @@ spec:
           value: "postgres"
         - name: POSTGRES_USER
           value: "postgres"
+        - name: POSTGRES_DB
+          value: "greenhouse"
         ports:
         - containerPort: 5432
         volumeMounts:

@@ -1,0 +1,25 @@
+# Kafka values for production deployment on AWS
+replicaCount: 3
+persistence:
+  enabled: true
+  size: 20Gi
+
+zookeeper:
+  replicaCount: 3
+  persistence:
+    enabled: true
+    size: 8Gi
+
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+metrics:
+  kafka:
+    enabled: false
+  jmx:
+    enabled: false
