@@ -1,79 +1,144 @@
-version: '3.8'
 services:
   zookeeper:
-    image: bitnami/zookeeper:latest
+    image: confluentinc/cp-zookeeper:7.5.0
+    hostname: zookeeper
+    container_name: zookeeper
     environment:
-      - ALLOW_ANONYMOUS_LOGIN=yes
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
     ports:
       - "2181:2181"
+    restart: unless-stopped
+
   kafka:
-    image: bitnami/kafka:latest
-    depends_on: [zookeeper]
+    image: confluentinc/cp-kafka:7.5.0
+    hostname: kafka
+    container_name: kafka
+    depends_on:
+      - zookeeper
     environment:
-      - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
-      - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
-      - KAFKA_LISTENERS=PLAINTEXT://0.0.0.0:9092
-      - ALLOW_PLAINTEXT_LISTENER=yes
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
     ports:
       - "9092:9092"
+    restart: unless-stopped
+
   mosquitto:
-    image: eclipse-mosquitto
-    ports: ["1883:1883"]
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto
+    volumes:
+      - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+    ports:
+      - "1883:1883"
+    restart: unless-stopped
   postgres:
     image: postgres:15
+    container_name: postgres
     environment:
       POSTGRES_PASSWORD: postgres
       POSTGRES_USER: postgres
-    ports: ["5432:5432"]
+      POSTGRES_DB: postgres
+    ports:
+      - "5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
   mqtt-kafka-gateway:
     build: ./services/mqtt-kafka-gateway
+    container_name: mqtt-kafka-gateway
     environment:
       MQTT_BROKER: mosquitto:1883
       KAFKA_BOOTSTRAP: kafka:9092
-    depends_on: [mosquitto,kafka]
+      KAFKA_TOPIC: sensors.raw
+    depends_on:
+      - mosquitto
+      - kafka
+    restart: unless-stopped
   sensor-processor:
     build: ./services/sensor-processor
+    container_name: sensor-processor
     environment:
       KAFKA_BOOTSTRAP: kafka:9092
-    depends_on: [kafka]
+      INPUT_TOPIC: sensors.raw
+      OUTPUT_TOPIC: sensors.processed
+    depends_on:
+      - kafka
+    restart: unless-stopped
   storage-writer:
     build: ./services/storage-writer
+    container_name: storage-writer
     environment:
       KAFKA_BOOTSTRAP: kafka:9092
+      INPUT_TOPIC: sensors.processed
       DB_HOST: postgres
+      DB_PORT: "5432"
       DB_USER: postgres
       DB_PASS: postgres
       DB_NAME: greenhouse
-    depends_on: [kafka,postgres]
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    restart: unless-stopped
   control-service:
     build: ./services/control-service
+    container_name: control-service
     environment:
       KAFKA_BOOTSTRAP: kafka:9092
+      INPUT_TOPIC: sensors.processed
+      OUTPUT_TOPIC: actuators.commands
       MQTT_BROKER: mosquitto:1883
-    depends_on: [kafka,mosquitto]
+    depends_on:
+      - kafka
+      - mosquitto
+    restart: unless-stopped
   api-gateway:
     build: ./services/api-gateway
+    container_name: api-gateway
     environment:
       DB_HOST: postgres
+      DB_PORT: "5432"
       DB_USER: postgres
       DB_PASS: postgres
       DB_NAME: greenhouse
     ports:
       - "8080:8000"
-    depends_on: [postgres]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
   frontend:
     build: ./services/frontend
+    container_name: frontend
     ports:
       - "8081:80"
-    depends_on: [api-gateway]
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
   load-generator:
     build: ./services/load-generator
+    container_name: load-generator
     environment:
       MODE: mqtt
       MQTT_BROKER: mosquitto:1883
-    depends_on: [mosquitto]
+      MQTT_TOPIC: greenhouse/sensors
+      SENSORS: "200"
+      RATE_PER_SENSOR: "0.2"
+    depends_on:
+      - mosquitto
+    restart: unless-stopped
 
 volumes:
   postgres-data:
